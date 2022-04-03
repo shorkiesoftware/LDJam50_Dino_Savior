@@ -117,11 +117,14 @@ void main(){\
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 }
 
-function renderTexturedMeshes(meshes, camera, lightPosition){
+function prepareTexturedMeshRenderer(){
     gl.useProgram(tmShader);
     gl.bindVertexArray(tmVao);
-    gl.uniform3fv(tmLightPositionID, lightPosition.toArray());
     gl.enable(gl.CULL_FACE);
+}
+
+function renderTexturedMeshes(meshes, camera, lightPosition){
+    gl.uniform3fv(tmLightPositionID, lightPosition.toArray());
     for(let i = 0; i < meshes.length; i++){
         let mesh = meshes[i];
         gl.bindTexture(gl.TEXTURE_2D, mesh.textureID);

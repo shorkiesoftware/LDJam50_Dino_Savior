@@ -13,7 +13,7 @@ class Vector2 {
     }
 
     static scale(v, amt){
-        return new Vector3(v.x * amt, v.y * amt);
+        return new Vector2(v.x * amt, v.y * amt);
     }
 
     static length(v){
@@ -22,6 +22,12 @@ class Vector2 {
 
     static copy(v){
         return new Vector2(v.x, v.y);
+    }
+
+    static distance(v1, v2){
+        let dx = v2.x - v1.x;
+        let dy = v2.y - v1.y;
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     static rotate(v, p, angle){
@@ -46,6 +52,11 @@ class Vector2 {
     sub(v1){
         this.x -= v1.x;
         this.y -= v1.y;
+    }
+
+    mul(v1){
+        this.x *= v1.x;
+        this.y *= v1.y;
     }
 
     normalize(){
