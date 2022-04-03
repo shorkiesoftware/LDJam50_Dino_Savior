@@ -80,6 +80,8 @@ var explosion2Texture;
 var explosion3Texture;
 var currentDinoTexture;
 var arrowTexture;
+var endScreenTexture;
+var titleTexture;
 var currentDinoWalkFrame = 0;
 var dinoAnimationTextures = [];
 var explosionAnimationTextures = [];
@@ -92,7 +94,7 @@ var explosionScales = [
 ];
 
 var spacePosition = new Vector2(0, 0);
-var spaceScale = new Vector2(spaceDataWidth * 3, spaceDataHeight * 3);
+var spaceScale = new Vector2(idealCanvasWidth, idealCanvasHeight);
 
 var planetPosition = new Vector2(700, 375);
 var planetScale = new Vector2(250, 250);
@@ -128,6 +130,12 @@ var asteroidFrameTime = 0.1;
 var asteroidAltColor = new Vector4(0.7, 0.7, 0.7, 1);
 var asteroidColorList = [whiteColor, asteroidAltColor];
 
+var planetAlive = true;
+var gameEndTimer = 0;
+var gameEndDuration = 10;
+var score = 0;
+var hiScore = 0;
+
 var asteroids = [];
 var explosions = [];
 var dustClouds = [];
@@ -142,8 +150,9 @@ var soundOn = false;
 const gameStateTitle = 0;
 const gameStatePlayGame = 1;
 const gameStateEnd = 2;
-const gameStateHowToPlay = 3;
-var currentGameState = gameStatePlayGame;
+const gameStateHowToPlay1 = 3;
+const gameStateHowToPlay2 = 4;
+var currentGameState = gameStateTitle;
 
 var keyInputs = new Array(128).fill(false);
 var keyLocks = new Array(128).fill(false);
@@ -151,9 +160,13 @@ var keyLocks = new Array(128).fill(false);
 window.onload = function(){
     window.addEventListener("resize", windowResized);
     window.addEventListener("mousedown", mousePressed);
-    window.addEventListener("mousemove", mouseMoved);
     window.addEventListener("keydown", keyDown);
     window.addEventListener("keyup", keyUp);
+
+    let hs = localStorage.getItem('hiScore');
+    if(hs != null){
+        hiScore = hs;
+    }
 
     canvas = document.getElementById("canvasID");
     textCanvas = document.getElementById("textCanvasID");
@@ -169,7 +182,7 @@ window.onload = function(){
     textCanvas.left = 0;
     textCanvas.width = idealCanvasWidth;
     textCanvas.height = idealCanvasHeight;
-    
+
     gl = canvas.getContext('webgl2');
     gl.viewport(0, 0, idealCanvasWidth, idealCanvasHeight);
     gl.enable(gl.DEPTH_TEST); 
@@ -194,6 +207,8 @@ window.onload = function(){
     explosion2Texture = generateGLTexture2D(explosion2Data, explosion2DataWidth, explosion2DataHeight);
     explosion3Texture = generateGLTexture2D(explosion3Data, explosion3DataWidth, explosion3DataHeight);
     arrowTexture = generateGLTexture2D(arrowData, arrowDataWidth, arrowDataHeight);
+    endScreeTexture = generateGLTexture2D(endScreenData, endScreenDataWidth, endScreenDataHeight);
+    titleTexture = generateGLTexture2D(titleData, titleDataWidth, titleDataHeight);
     dinoAnimationTextures.push(dino1Texture);
     dinoAnimationTextures.push(dino2Texture);
     dinoAnimationTextures.push(dino1Texture);
@@ -231,22 +246,26 @@ function updateGame(){
     switch(currentGameState){
         case gameStateTitle:{
             if(keyPressedOnce(KEY_W)){
-                currentGameState = gameStateHowToPlay;
+                currentGameState = gameStateHowToPlay1;
             }else if(keyPressedOnce(KEY_ENTER)){
-                gl.clearColor(0.8, 0.5, 0, 1);
+                resetGame();
                 currentGameState = gameStatePlayGame;
             }
-
-            textContext.fillText("Game Title", 650 * textOffset, 100 * textOffset);
-            textContext.fillText("Click to toggle sound", 450, 200);
+            
+            renderQuad(new Vector2(), new Vector2(idealCanvasWidth, idealCanvasHeight), new Vector4(1, 1, 1, 0.6), endScreeTexture);
+            renderQuad(new Vector2(500, 500), new Vector2(titleDataWidth * 3, titleDataHeight * 3), whiteColor, titleTexture);
+            textScale = canvas.width * 0.05;
+            textContext.font = textScale + "px Arial";
+            textContext.fillStyle = "#CCCCCC";
+            textContext.fillText("Click to Toggle Sound: ", 500 * textOffset, 650 * textOffset);
             if(soundOn){
-                textContext.fillText("Sound: On", 650, 300);
+                textContext.fillText("ON", 1500 * textOffset, 655 * textOffset);
             }else{
-                textContext.fillText("Sound: Off", 650, 300);
+                textContext.fillText("OFF", 1500 * textOffset, 655 * textOffset);
             }
-
-            textContext.fillText("Press W to learn how to play", 400, 400);
-            textContext.fillText("Press ENTER to begin game", 400, 500);
+            textContext.fillText("Press W to Learn How to Play", 430 * textOffset, 780 * textOffset);
+            textContext.fillText("Press ENTER to Start the Game", 380 * textOffset, 910 * textOffset);
+            textContext.fillText("High Score: " + hiScore, 700 * textOffset, 1030 * textOffset);
             break;
         }
         case gameStatePlayGame:{
@@ -364,10 +383,25 @@ function updateGame(){
             }
 
             textContext.fillStyle = "#FFFFFF";
-            textContext.fillText("delta: " + deltaTime, 50 * textOffset, 50 * textOffset);
+            textContext.fillText("Score: " + score.toFixed(3), 50 * textOffset, 50 * textOffset);
             renderQuad(Vector2.add(cameraOffset, spacePosition), spaceScale, whiteColor, spaceTexture);
             renderRotatedQuad(planetPosition, planetScale, whiteColor, planetTexture, planetAngle);
-            renderQuad(dinoPosition, dinoScale, whiteColor, currentDinoTexture);
+
+            if(planetAlive){
+                score += deltaTime;
+                renderQuad(dinoPosition, dinoScale, whiteColor, currentDinoTexture);
+            }else{
+                gameEndTimer += deltaTime;
+                if(gameEndTimer > gameEndDuration){
+                    currentGameState = gameStateEnd;
+                }
+
+                if(Math.random() < 0.05){
+                    let xx = map(Math.random(), 0, 1, -100, 100);
+                    let yy = map(Math.random(), 0, 1, -100, 100);
+                    explosions.push(new Explosion(planetCenter.x + xx, planetCenter.y + yy));
+                }
+            }
 
             for(let i = 0; i < asteroids.length; i++){
                 let as = asteroids[i];
@@ -438,8 +472,12 @@ function updateGame(){
                     cameraShake = true;
                     cameraShakeTimer = 0;
                     planetHealth -= as.size;
-                    if(planetHealth < 0){
+                    if(planetHealth <= 0){
                         planetHealth = 0;
+                        planetAlive = false;
+                        cameraShake = true;
+                        cameraShakeDuration = 10;
+                        cameraShakeTimer = 0;
                     }
                     playSound(boomAudio);
                     i--;
@@ -486,19 +524,114 @@ function updateGame(){
                 }
             }
 
+            textContext.fillText("Planet's Health", 500 * textOffset, 875 * textOffset);
             renderQuad(new Vector2(400, 100), new Vector2(800, 100), planetHealthBackgroundColor);
             renderQuad(new Vector2(420, 120), new Vector2(760 * (planetHealth / planetMaxHealth), 60), planetHealthForegroundColor);
 
             break;
         }
         case gameStateEnd:{
+            textScale = canvas.width * 0.15;
+            textContext.font = textScale + "px Arial";
+            textContext.fillStyle = "#333333";
+            textContext.fillText("GAME OVER", 100 * textOffset, 300 * textOffset);
+            textScale = canvas.width * 0.14;
+            textContext.font = textScale + "px Arial";
+            textContext.fillStyle = "#EEEEEE";
+            textContext.fillText("GAME OVER", 160 * textOffset, 300 * textOffset);
+
+            textScale = canvas.width * 0.045;
+            textContext.font = textScale + "px Arial";
+            textContext.fillStyle = "#EEEEEE";
+            textContext.fillText("You kept the planet alive for " + score.toFixed(3) + " seconds.", 50 * textOffset, 600 * textOffset);
+            if(score > hiScore){
+                textContext.fillText("NEW HI SCORE!", 650 * textOffset, 700 * textOffset);
+            }
+            textContext.fillText("Press ENTER to Play Again", 450 * textOffset, 800 * textOffset);
+            textContext.fillText("Press W to Return to the Title Screen", 250 * textOffset, 900 * textOffset);
+
+            renderQuad(new Vector2(), new Vector2(idealCanvasWidth, idealCanvasHeight), new Vector4(1, 1, 1, 0.6), endScreeTexture);
+
+            if(keyPressedOnce(KEY_W)){
+                currentGameState = gameStateTitle;
+                if(score > hiScore){
+                    hiScore = score.toFixed(3);
+                    localStorage.setItem('hiScore', "" + hiScore);
+                }
+            }
+            if(keyPressedOnce(KEY_ENTER)){
+                if(score > hiScore){
+                    hiScore = score.toFixed(3);
+                    localStorage.setItem('hiScore', "" + hiScore);
+                }
+                resetGame();
+                currentGameState = gameStatePlayGame;
+            }
             break;
         }
-        case gameStateHowToPlay:{
-            textContext.fillText("A to left", 400, 100);
-            textContext.fillText("D to right", 400, 200);
-            textContext.fillText("SPACE to jump", 400, 300);
-            textContext.fillText("Press SPACE to return to the main menu", 100, 400);
+        case gameStateHowToPlay1:{
+            textScale = canvas.width * 0.04;
+            textContext.font = textScale + "px Arial";
+            textContext.fillStyle = "#CCCCCC";
+            textContext.fillText("Asteroids are coming to destroy your planet!", 50 * textOffset, 100 * textOffset);
+            textContext.fillText("Press A to Move Left", 50 * textOffset, 200 * textOffset);
+            textContext.fillText("Press D to Move Right", 50 * textOffset, 300 * textOffset);
+            textContext.fillText("Press W to Jump", 50 * textOffset, 400 * textOffset);
+
+            textScale = canvas.width * 0.03;
+            textContext.font = textScale + "px Arial";
+            textContext.fillText("Hit the Asteroids with Your Head While Jumping to Deflect Them", 50 * textOffset, 550 * textOffset);
+
+            textScale = canvas.width * 0.02;
+            textContext.font = textScale + "px Arial";
+            textContext.fillText("Press SPACE to Continue", 800 * textOffset, 1100 * textOffset);
+
+            renderQuad(new Vector2(1400, 840), new Vector2(asteroidDataWidth * 1.75, asteroidDataHeight * 1.75), whiteColor, asteroidTexture);
+            renderQuad(new Vector2(830, 780), new Vector2(-dino2DataWidth * 1.75, dino2DataHeight * 1.75), whiteColor, dino2Texture);
+            renderQuad(new Vector2(750, 700), new Vector2(dino2DataWidth * 1.75, dino2DataHeight * 1.75), whiteColor, dino2Texture);
+            renderQuad(new Vector2(550, 550), new Vector2(dinoJumpDataWidth * 1.75, dinoJumpDataHeight * 1.75), whiteColor, dinoJumpTexture);
+            renderQuad(new Vector2(580, 100), new Vector2(dinoJumpDataWidth * 3, dinoJumpDataHeight * 3), whiteColor, dinoJumpTexture);
+            renderQuad(new Vector2(700, 305), new Vector2(explosion2DataWidth * 3, explosion2DataWidth * 3), whiteColor, explosion2Texture);
+            renderQuad(new Vector2(770, 365), new Vector2(rockDataWidth * 2, rockDataHeight * 2), whiteColor, rockTexture);
+
+            if(keyPressedOnce(KEY_SPACE)){
+                currentGameState = gameStateHowToPlay2;
+            }
+            break;
+        }
+        case gameStateHowToPlay2:{
+            textScale = canvas.width * 0.04;
+            textContext.font = textScale + "px Arial";
+            textContext.fillStyle = "#CCCCCC";
+            textContext.fillText("Colliding Asteroids Will Damage the Planet", 50 * textOffset, 100 * textOffset);
+
+            textContext.fillText("Larger Asteroids Will Do More Damage", 50 * textOffset, 400 * textOffset);
+
+            textScale = canvas.width * 0.03;
+            textContext.font = textScale + "px Arial";
+            textContext.fillText("The Planet Will be Destroyed When Its Health Reaches 0", 50 * textOffset, 600 * textOffset);
+            textContext.fillText("Deflect Asteroids into Others to Increase the Planet's Health", 50 * textOffset, 800 * textOffset);
+
+            textScale = canvas.width * 0.02;
+            textContext.font = textScale + "px Arial";
+            textContext.fillText("Press SPACE to Return to the Title Screen", 600 * textOffset, 1100 * textOffset);
+
+            textScale = canvas.width * 0.01;
+            textContext.font = textScale + "px Arial";
+            textContext.fillText("Planet's Health", 500 * textOffset, 450 * textOffset);
+            textContext.fillText("Planet's Health", 500 * textOffset, 650 * textOffset);
+
+            renderQuad(new Vector2(700, 680), new Vector2(planetDataWidth, planetDataHeight), whiteColor, planetTexture);
+            renderQuad(new Vector2(780, 780), new Vector2(explosion3DataWidth * 2, explosion3DataHeight * 2), whiteColor, explosion3Texture);
+
+            renderQuad(new Vector2(400, 520), new Vector2(600, 50), planetHealthBackgroundColor);
+            renderQuad(new Vector2(420, 530), new Vector2(500, 30), planetHealthForegroundColor);
+            renderQuad(new Vector2(400, 350), new Vector2(600, 50), planetHealthBackgroundColor);
+
+            renderRotatedQuad(new Vector2(700, 180), new Vector2(asteroidDataWidth * 1, asteroidDataHeight * 1), whiteColor, asteroidTexture, -2);
+            renderQuad(new Vector2(685, 65), new Vector2(rockDataWidth * 1.1, rockDataHeight * 1.1), whiteColor, rockTexture);
+            renderQuad(new Vector2(700, 95), new Vector2(explosion2DataWidth * 3, explosion2DataWidth * 3), whiteColor, explosion2Texture);
+
             if(keyPressedOnce(KEY_SPACE)){
                 currentGameState = gameStateTitle;
             }
@@ -509,6 +642,23 @@ function updateGame(){
     endTime = new Date().getTime();
     deltaTime = (endTime - startTime) / 1000.0;
     startTime = endTime;
+}
+
+function resetGame(){
+    asteroids = [];
+    explosions = [];
+    dustClouds = [];
+    planetHealth = planetMaxHealth;
+    score = 0;
+    planetAngle = 0;
+    cameraShake = false;
+    cameraShakeDuration = 1;
+    currentDinoWalkFrame = 0
+    planetAlive = true;
+    gameEndTimer = 0;
+    gameEndDuration = 10;
+    asteroidLaunchTimer = 0;
+    asteroidLaunchDuration = 10;
 }
 
 function windowResized(e){
@@ -552,10 +702,6 @@ function mousePressed(e){
 
         playSound(testAudio);
     }
-}
-
-function mouseMoved(e){
-
 }
 
 function keyPressedOnce(key){
